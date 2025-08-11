@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>IA22 Console — NetSecurePro</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="Console IA22 interactive — NetSecurePro (Frontend avec mode offline / backend FastAPI configurable)" />
+  <style>
+    :root{
+      --bg:#0f1118; --card:#191c23; --accent:#ffbb00; --muted:#8f97a3; --success:#00d28a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+      background:var(--bg); color:#e7eef7; min-height:100vh; display:flex; flex-direction:column;
+    }
+    header{
+      padding:18px 20px; border-bottom:3px solid rgba(255,187,0,0.08);
+      background:linear-gradient(90deg,#0f1118 0%, #11131a 100%);
+      display:flex; align-items:center; gap:16px; justify-content:space-between;
+    }
+    header .title{display:flex; flex-direction:column}
+    h1{margin:0; color:var(--accent); font-size:1.25rem}
+    h2{margin:0; color:var(--muted); font-weight:400; font-size:0.9rem}
+    main{display:flex; gap:20px; padding:18px; flex:1; align-items:flex-start}
+    /* Left column = console */
+    .col{flex:1; min-width:320px}
+    .card{background:var(--card); border-radius:10px; padding:14px; box-shadow: 0 6px 20px rgba(0,0,0,0.6);}
+    #console{
+      height:56vh; max-height:74vh; overflow:auto; padding:12px; border-radius:8px;
+      background:linear-gradient(180deg, rgba(0,0,0,0.15), transparent);
+      font-family:ui-monospace, "Courier New", monospace; font-size:0.95rem; line-height:1.45;
+      white-space:pre-wrap;
+    }
+    #inputArea{display:flex; gap:8px; margin-top:12px}
+    #cmd{flex:1; padding:10px 12px; border-radius:8px; border:none; background:#0e1420; color:#eaf4ff; font-family:inherit}
+    button{background:var(--accent); color:#111; border:none; padding:10px 14px; border-radius:8px; font-weight:700; cursor:pointer}
+    button.secondary{background:#2a2f38; color:#eaeef2; border:1px solid rgba(255,255,255,0.03)}
+    .controls{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    .meta{color:var(--muted); font-size:0.85rem}
+    /* Right column = IPTV + settings */
+    .right {width:380px; min-width:300px; display:flex; flex-direction:column; gap:12px}
+    video{width:100%; height:200px; border-radius:8px; background:#000; outline:1px solid rgba(255,255,255,0.02)}
+    .settings{display:flex; flex-direction:column; gap:8px}
+    label{font-size:0.85rem; color:var(--muted)}
+    input[type=text].small{padding:8px 10px; border-radius:8px; border:none; background:#0e1420; color:#eaf4ff}
+    .history-list{max-height:120px; overflow:auto; padding:8px; border-radius:6px; background:#0b0d11; font-family:monospace}
+    footer{padding:12px 18px; color:#7f8b96; font-size:0.85rem; text-align:center; border-top:1px solid rgba(255,255,255,0.02)}
+    a.link{color:var(--accent); text-decoration:none}
+    .kbd{background:#0b0d11;padding:4px 8px;border-radius:6px;color:var(--muted);font-size:0.85rem;border:1px solid rgba(255,255,255,0.02)}
+    .status{display:inline-block;padding:4px 8px;border-radius:6px;background:#081411;color:var(--muted);border:1px solid rgba(255,255,255,0.02);font-size:0.85rem}
+    @media (max-width:900px){
+      main{flex-direction:column}
+      .right{width:100%}
+      #console{height:46vh}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <h1>IA22 Console — NetSecurePro</h1>
+      <h2>🧬 Serveur IA hybride Python+C — Zoubirou Mohammed Ilyes</h2>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="meta">ORCID: <a class="link" href="https://orcid.org/0009-0007-7571-3178" target="_blank">0009-0007-7571-3178</a></div>
+      <div class="status" id="backendStatus">Mode: offline</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT : Console -->
+    <section class="col">
+      <div class="card">
+        <div id="console" aria-live="polite">🔎 Console IA22 démarrée... Tape ta commande et appuie sur Entrée (ou clique Envoyer). Tape <span class="kbd">help</span> pour la liste des commandes.</div>
+
+        <div id="inputArea">
+          <input id="cmd" placeholder="Commande IA22 (ex: help, emprunt <nom> <montant>, iptv start, loadfile <raw_url>)" autocomplete="off" />
+          <button id="sendBtn">Envoyer</button>
+        </div>
+
+        <div class="controls">
+          <button class="secondary" id="clearBtn">Clear</button>
+          <button class="secondary" id="copyBtn">Copier Console</button>
+          <button id="toggleModeBtn">Basculer : backend →</button>
+
+          <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+            <span class="meta">Historique :</span>
+            <div id="histCount" class="meta">0</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="meta">Raccourcis : <span class="kbd">Enter</span> envoyer — <span class="kbd">help</span> liste</div>
+        </div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <div><strong>Chargement logic_data</strong></div>
+          <div class="meta">Tu peux fournir une URL raw GitHub</div>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <input id="rawUrl" class="small" type="text" placeholder="ex: https://raw.githubusercontent.com/milyes/.../logic_data/data.json" />
+          <button id="loadFileBtn" class="secondary">Charger</button>
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="meta">Contenu chargé :</div>
+          <div id="loadedData" class="history-list">Aucun fichier chargé.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT : IPTV + settings -->
+    <aside class="right">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center">
+          <div><strong>📡 IPTV Player</strong></div>
+          <div class="meta">m3u8 / HLS</div>
+        </div>
+        <video id="iptv" controls playsinline preload="metadata">
+          <source id="iptvSource" src="https://iptv-qc.ca/stream/ia22stream.m3u8" type="application/x-mpegURL">
+          Ton navigateur ne supporte pas la lecture HLS.
+        </video>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input id="iptvUrl" class="small" type="text" placeholder="URL IPTV (m3u8)" value="https://iptv-qc.ca/stream/ia22stream.m3u8" />
+          <button id="setIptvBtn" class="secondary">Mettre</button>
+        </div>
+      </div>
+
+      <div class="card settings">
+        <div><strong>⚙️ Backend / Mode</strong></div>
+
+        <label>URL backend (POST JSON):</label>
+        <input id="backendUrl" class="small" type="text" placeholder="https://ton-backend.example/api/ia22/execute" />
+
+        <label>Timeout requête (ms)</label>
+        <input id="backendTimeout" class="small" type="text" value="7000" />
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="pingBtn" class="secondary">Vérifier backend</button>
+          <button id="saveCfgBtn" class="secondary">Sauvegarder cfg</button>
+        </div>
+
+        <div style="margin-top:8px">
+          <div class="meta">Mode d'exécution: <span id="modeLabel">offline (local simulate)</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div><strong>Historique rapide</strong></div>
+        <div id="historyQuick" class="history-list">Vide</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="exportHistoryBtn" class="secondary">Exporter</button>
+          <button id="clearHistoryBtn" class="secondary">Vider</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    © 2025 NetSecurePro IA — Zoubirou Mohammed Ilyes • <a class="link" href="https://milyes.github.io/IA22_LOGICVMQEM/" target="_blank">Demo</a>
+  </footer>
+
+  <script>
+    /************************************************************************
+     * IA22 Frontend Console
+     * - Mode offline (simulation)
+     * - Mode backend (POST JSON { commande: "<text>" } -> expects JSON { resultat: "..." })
+     * - Charger logic_data via URL raw (affiche contenu JSON / texte)
+     * - Historique stocké dans localStorage (key: ia22_history)
+     ************************************************************************/
+
+    // Elements
+    const consoleEl = document.getElementById('console');
+    const cmdEl = document.getElementById('cmd');
+    const sendBtn = document.getElementById('sendBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const toggleModeBtn = document.getElementById('toggleModeBtn');
+    const backendStatusEl = document.getElementById('backendStatus');
+    const backendUrlEl = document.getElementById('backendUrl');
+    const backendTimeoutEl = document.getElementById('backendTimeout');
+    const pingBtn = document.getElementById('pingBtn');
+    const saveCfgBtn = document.getElementById('saveCfgBtn');
+    const modeLabel = document.getElementById('modeLabel');
+    const histCountEl = document.getElementById('histCount');
+    const rawUrlEl = document.getElementById('rawUrl');
+    const loadFileBtn = document.getElementById('loadFileBtn');
+    const loadedDataEl = document.getElementById('loadedData');
+    const historyQuick = document.getElementById('historyQuick');
+    const exportHistoryBtn = document.getElementById('exportHistoryBtn');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const iptvUrlEl = document.getElementById('iptvUrl');
+    const setIptvBtn = document.getElementById('setIptvBtn');
+    const iptvEl = document.getElementById('iptv');
+    const iptvSource = document.getElementById('iptvSource');
+
+    // Config and state
+    const STORAGE_KEYS = { history: 'ia22_history_v1', cfg: 'ia22_cfg_v1' };
+    let history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]');
+    let cfg = JSON.parse(localStorage.getItem(STORAGE_KEYS.cfg) || '{}');
+    let mode = cfg.mode || 'offline'; // 'offline' or 'backend'
+
+    // Initialize UI from cfg
+    backendUrlEl.value = cfg.backendUrl || '';
+    backendTimeoutEl.value = cfg.timeout || 7000;
+    modeLabel.textContent = mode + (mode === 'backend' ? ' (backend actif)' : ' (offline simulate)');
+
+    // Utility: print to console
+    function print(...parts){
+      const text = parts.join('');
+      consoleEl.textContent += '\\n' + text;
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    // Update history UI
+    function saveHistoryEntry(command, response){
+      const entry = { ts: Date.now(), command, response };
+      history.unshift(entry);
+      if (history.length > 200) history.pop();
+      localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
+      updateHistoryUI();
+    }
+    function updateHistoryUI(){
+      histCountEl.textContent = history.length;
+      historyQuick.innerHTML = history.slice(0,10).map(h => {
+        const d = new Date(h.ts);
+        return `<div style="padding:6px 4px;border-bottom:1px dashed rgba(255,255,255,0.02)"><strong>${h.command}</strong><div class="meta" style="margin-top:6px">${d.toLocaleString()} — ${String(h.response).slice(0,120)}</div></div>`;
+      }).join('') || 'Vide';
+    }
+
+    // Simple simulated IA processing (offline)
+    function simulateIA(command){
+      command = command.trim();
+      if (!command) return '❌ Commande vide.';
+      const cmd = command.toLowerCase();
+      if (cmd === 'help' || cmd === 'aide') {
+        return [
+          '📚 Commandes IA22 :',
+          '- help / aide : affiche ceci',
+          '- emprunt <nom> <montant> : enregistre un emprunt (simulé)',
+          '- iptv start : affiche URL du flux',
+          '- iptv play <url> : remplace le player par <url>',
+          '- loadfile <raw_url> : charge un fichier raw (json/txt) depuis GitHub',
+          '- clear : efface la console',
+          '- date : affiche la date',
+          '- exit : termine (simulé)'
+        ].join('\\n');
+      }
+      if (cmd.startsWith('emprunt ')){
+        const parts = command.split(/\\s+/);
+        if (parts.length >= 3){
+          const nom = parts[1];
+          const montant = parseFloat(parts[2]);
+          if (!nom) return '❌ Nom invalide.';
+          if (isNaN(montant) || montant <= 0) return '❌ Montant invalide.';
+          return `✅ Emprunt enregistré (simulé) : ${nom} → ${montant} €\\n🧠 IA22: synchronisation programmée (simulé).`;
+        }
+        return '❌ Usage: emprunt <nom> <montant>';
+      }
+      if (cmd === 'iptv start') {
+        return '📡 IPTV : lancer le flux (utilise le player intégré).';
+      }
+      if (cmd.startsWith('iptv play ')){
+        const url = command.slice(10).trim();
+        if (url) {
+          setIptv(url);
+          return `📡 Player mis à jour : ${url}`;
+        }
+        return '❌ Usage: iptv play <m3u8_url>';
+      }
+      if (cmd.startsWith('loadfile ')){
+        const url = command.slice(9).trim();
+        if (!url) return '❌ Fournis une URL raw.';
+        loadRawFile(url);
+        return `🔄 Chargement en cours : ${url}`;
+      }
+      if (cmd === 'clear') {
+        consoleEl.textContent = '🔎 Console IA22 démarrée... Tape ta commande et appuie sur Entrée.';
+        return null;
+      }
+      if (cmd === 'date') {
+        return `🕒 ${new Date().toLocaleString('fr-FR')}`;
+      }
+      if (cmd === 'exit') {
+        return '👋 Session IA22 terminée (simulée).';
+      }
+      return `❓ Commande inconnue : "${command}". Tape "help" pour la liste.`;
+    }
+
+    // Send command to backend (if configured)
+    async function sendToBackend(command){
+      const url = backendUrlEl.value.trim();
+      const timeout = parseInt(backendTimeoutEl.value) || 7000;
+      if (!url) throw new Error('URL backend non configurée.');
+      // POST JSON { commande: "..." } -> expects { resultat: "..." } (convention)
+      const controller = new AbortController();
+      const id = setTimeout(()=>controller.abort(), timeout);
+      const resp = await fetch(url, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ commande: command }),
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      if (!resp.ok) throw new Error('Erreur HTTP ' + resp.status);
+      const json = await resp.json();
+      // Support multiple response shapes
+      if (typeof json.resultat !== 'undefined') return json.resultat;
+      if (typeof json.result !== 'undefined') return json.result;
+      if (typeof json.output !== 'undefined') return json.output;
+      return JSON.stringify(json, null, 2);
+    }
+
+    // Main process command (decides offline/backend)
+    async function processCommand(command){
+      print('> ' + command);
+      try {
+        let response = null;
+        if (mode === 'backend' && backendUrlEl.value.trim()){
+          // try backend
+          try {
+            response = await sendToBackend(command);
+            print(response);
+            saveHistoryEntry(command, response);
+            return;
+          } catch (errBackend) {
+            print(`⚠️ Backend erreur: ${errBackend.message} — bascule en simulateur offline.`);
+            // fallback to simulate
+          }
+        }
+        // offline or backend failed -> simulate
+        const sim = simulateIA(command);
+        if (sim !== null) print(sim);
+        saveHistoryEntry(command, sim);
+      } catch (err){
+        print('❌ Erreur interne: ' + err.message);
+      }
+    }
+
+    // UI actions
+    sendBtn.addEventListener('click', ()=>{ const v = cmdEl.value.trim(); if(!v) return; processCommand(v); cmdEl.value=''; cmdEl.focus(); });
+    cmdEl.addEventListener('keydown', (e)=>{ if (e.key==='Enter') { sendBtn.click(); e.preventDefault(); } });
+
+    clearBtn.addEventListener('click', ()=>{
+      consoleEl.textContent = '🔎 Console IA22 démarrée... Tape ta commande et appuie sur Entrée.';
+    });
+    copyBtn.addEventListener('click', ()=>{
+      navigator.clipboard.writeText(consoleEl.textContent).then(()=>alert('Console copiée'));
+    });
+
+    toggleModeBtn.addEventListener('click', ()=>{
+      mode = (mode === 'offline') ? 'backend' : 'offline';
+      modeLabel.textContent = mode + (mode === 'backend' ? ' (backend actif)' : ' (offline simulate)');
+      backendStatusEl.textContent = 'Mode: ' + (mode === 'backend' ? 'backend' : 'offline');
+      cfg.mode = mode; localStorage.setItem(STORAGE_KEYS.cfg, JSON.stringify(cfg));
+    });
+
+    // Ping backend (HEAD or GET)
+    pingBtn.addEventListener('click', async ()=>{
+      const url = backendUrlEl.value.trim();
+      if (!url) { alert('Renseigne l\'URL du backend'); return; }
+      backendStatusEl.textContent = 'Vérification...';
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(()=>controller.abort(), 5000);
+        const resp = await fetch(url, { method:'OPTIONS', signal:controller.signal });
+        clearTimeout(id);
+        backendStatusEl.textContent = resp.ok ? 'backend: reachable' : 'backend: repondu ' + resp.status;
+      } catch (err) {
+        backendStatusEl.textContent = 'backend: unreachable';
+      }
+    });
+
+    saveCfgBtn.addEventListener('click', ()=>{
+      cfg.backendUrl = backendUrlEl.value.trim();
+      cfg.timeout = parseInt(backendTimeoutEl.value) || 7000;
+      cfg.mode = mode;
+      localStorage.setItem(STORAGE_KEYS.cfg, JSON.stringify(cfg));
+      alert('Configuration sauvegardée localement.');
+    });
+
+    // load raw file from URL (display text or JSON)
+    async function loadRawFile(url){
+      try {
+        loadedDataEl.textContent = 'Chargement...';
+        const controller = new AbortController();
+        const id = setTimeout(()=>controller.abort(), 10000);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(id);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        // Try JSON parse for pretty display
+        try {
+          const j = JSON.parse(text);
+          loadedDataEl.textContent = JSON.stringify(j, null, 2);
+        } catch {
+          loadedDataEl.textContent = text.slice(0, 20000) || '(vide)';
+        }
+        print(`🔽 Fichier chargé : ${url}`);
+      } catch (err){
+        loadedDataEl.textContent = 'Erreur: ' + err.message;
+        print('❌ Erreur chargement fichier: ' + err.message);
+      }
+    }
+
+    loadFileBtn.addEventListener('click', ()=>{ const url = rawUrlEl.value.trim(); if (!url) { alert('Fournis une URL raw'); return;} loadRawFile(url); });
+
+    // Expose loadfile command support
+    window.loadRawFile = loadRawFile;
+
+    // History export / clear
+    exportHistoryBtn.addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(history, null, 2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'ia22_history.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    clearHistoryBtn.addEventListener('click', ()=>{
+      if (!confirm('Vider l\'historique local ?')) return;
+      history = []; localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history)); updateHistoryUI();
+    });
+
+    // IPTV set
+    setIptvBtn.addEventListener('click', ()=>{ const u = iptvUrlEl.value.trim(); if (!u) return alert('Fournis URL m3u8'); setIptv(u); });
+    function setIptv(url){
+      iptvSource.src = url;
+      iptvEl.load();
+      print('📡 IPTV source mis à jour : ' + url);
+    }
+
+    // initial UI updates
+    updateHistoryUI();
+    backendStatusEl.textContent = 'Mode: ' + (mode === 'backend' ? 'backend' : 'offline');
+
+    // Autoload config on enter key in backendUrl
+    backendUrlEl.addEventListener('keydown', (e)=>{ if (e.key==='Enter') saveCfgBtn.click(); });
+
+    // Focus input
+    window.addEventListener('load', ()=>{ cmdEl.focus(); });
+
+    // Helpful starter messages
+    setTimeout(()=> {
+      print('✅ IA22 prêt. Mode: ' + mode + '.');
+      print('ℹ️ Astuce: teste "help", ou "emprunt ali 120"');
+    }, 500);
+  </script>
+</body>
+</html>
