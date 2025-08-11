@@ -1,17 +1,44 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Analyse Visuelle IA22</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>Console IA22 - Logic VMQEM</title>
+  <style>
+    body { background: #0f1118; color: #eee; font-family: "Segoe UI", sans-serif; padding: 20px; }
+    #console { background: #191c23; padding: 20px; border-radius: 8px; font-family: monospace; height: 300px; overflow-y: auto; }
+    input { width: 70%; padding: 10px; border-radius: 6px; border: none; margin-right: 8px; }
+    button { padding: 10px; border: none; border-radius: 6px; background: #ffbb00; color: #111; font-weight: bold; cursor: pointer; }
+  </style>
 </head>
 <body>
-  <h1>🧠 Analyse d’image IA22</h1>
-  <form id="uploadForm">
-    <input type="file" id="imageInput" accept="image/*" required>
-    <button type="submit">Analyser</button>
-  </form>
-  <div id="results"></div>
-  <script src="script.js"></script>
+
+  <h1>Console IA22</h1>
+  <div id="console">Bienvenue dans IA22 Logic VMQEM console.</div>
+  <input id="cmdInput" type="text" placeholder="Tape une commande IA22..." />
+  <button onclick="envoyerCommande()">Exécuter</button>
+
+  <script>
+    const consoleDiv = document.getElementById("console");
+    async function envoyerCommande() {
+      const cmd = document.getElementById("cmdInput").value.trim();
+      if (!cmd) return;
+      consoleDiv.innerHTML += `<br/><span style="color:#ffbb00;">> ${cmd}</span>`;
+      document.getElementById("cmdInput").value = "";
+      try {
+        // Remplacer par ton URL API backend
+        const response = await fetch("https://ton-backend/api/ia22/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commande: cmd }),
+        });
+        const data = await response.json();
+        consoleDiv.innerHTML += `<br/>${data.resultat}`;
+      } catch (err) {
+        consoleDiv.innerHTML += `<br/><span style="color:red;">Erreur API: ${err.message}</span>`;
+      }
+      consoleDiv.scrollTop = consoleDiv.scrollHeight;
+    }
+  </script>
+
 </body>
 </html>
