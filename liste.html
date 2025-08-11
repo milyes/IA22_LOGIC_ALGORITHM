@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IA22_LOGIC — Commandes disponibles</title>
+<meta name="description" content="Tableau de bord des commandes IA22_LOGIC / NetSecurePro IA — search, copy, run (optionnel)">
+
+<style>
+  :root{
+    --bg:#0b1020; --card:#0f1724; --muted:#98a8b3; --accent:#06b6d4; --accent-2:#00ff88;
+    --glass: rgba(255,255,255,0.03);
+    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071018 0%, #07111a 100%);color:#e6eef8}
+  .wrap{max-width:1100px;margin:20px auto;padding:18px}
+  header{display:flex;gap:12px;align-items:center}
+  h1{margin:0;font-size:1.25rem}
+  p.lead{margin:0;color:var(--muted);font-size:0.95rem}
+  .toolbar{display:flex;gap:8px;margin-top:12px;align-items:center}
+  input[type="search"]{flex:1;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:var(--card);color:var(--muted)}
+  .btn{background:var(--accent);color:#012;padding:9px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(255,255,255,0.04)}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  .card{background:var(--card);padding:14px;border-radius:12px;box-shadow:0 6px 24px rgba(2,6,23,0.6)}
+  .card h3{margin:0 0 8px 0;font-size:1rem}
+  .cmd{font-family:monospace;background:var(--glass);padding:8px;border-radius:8px;color:#cfeef8;margin-bottom:8px;display:flex;gap:8px;align-items:center}
+  .cmd .code{flex:1;overflow:auto;white-space:nowrap}
+  .meta{color:var(--muted);font-size:0.85rem;margin-bottom:8px}
+  .small{font-size:0.85rem;color:var(--muted)}
+  .tag{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);color:var(--muted);font-weight:700}
+  .actions{display:flex;gap:8px}
+  .pill{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);font-weight:600;font-size:0.85rem}
+  footer{margin-top:18px;color:var(--muted);font-size:0.85rem;text-align:center}
+  .copyok{color:var(--accent-2);font-weight:700}
+  /* tiny tooltip */
+  .tooltip{position:relative}
+  .tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:0;background:#000;padding:6px 8px;border-radius:6px;color:#fff;font-size:12px;white-space:nowrap}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>IA22_LOGIC — Catalogue des commandes</h1>
+        <p class="lead">NetSecurePro IA — Liste centralisée des commandes et scripts disponibles. Recherche, copie et exécution (optionnelle, via API).</p>
+      </div>
+      <div style="margin-left:auto" class="small">Utilisateur : <span class="tag">root</span></div>
+    </header>
+
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Rechercher commande, script, description..." />
+      <button id="clearBtn" class="btn ghost">Effacer</button>
+      <button id="exportBtn" class="btn">Exporter CSV</button>
+    </div>
+
+    <div style="margin-top:12px;color:var(--muted);font-size:0.92rem">Astuce : clique sur <span class="pill">Copier</span> pour copier la commande, ou <span class="pill">Exécuter</span> si ton serveur expose <code>/api/execute</code> (fortement recommandé : endpoint sécurisé).</div>
+
+    <div class="grid" id="grid">
+      <!-- cards injected by JS -->
+    </div>
+
+    <footer>
+      <div>IA22_LOGIC — NetSecurePro. Pour exécuter des commandes à distance, expose '/api/execute' qui accepte { "cmd": "..." } et vérifie les droits.</div>
+    </footer>
+  </div>
+
+<script>
+/*
+  IA22_LOGIC Commands UI
+  - data: built-in list of commands (categories)
+  - search, copy, export CSV
+  - optional run: POST /api/execute { cmd } (must exist on backend)
+*/
+
+// ----- Liste des commandes (catégorisées) -----
+// Ajoute / modifie ici selon ton environnement
+const COMMANDS = [
+  // Setup & Install
+  {cat:'Setup', name:'Install essentials (Debian/Ubuntu)', cmd:'apt update && apt upgrade -y && apt install -y python3 python3-pip python3-venv nmap curl jq git', desc:'Met à jour et installe paquets de base (Debian/Ubuntu)'},
+  {cat:'Setup', name:'Termux essentials', cmd:'pkg update -y && pkg install -y python nmap curl jq git', desc:'Installer paquets essentiels sur Termux'},
+  {cat:'Setup', name:'Setup NetSecurePro full', cmd:'bash setup_netsecurepro_full.sh', desc:'Script global d\'installation et lancement'},
+  {cat:'Setup', name:'Créer venv & installer deps', cmd:'python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt', desc:'Environnement virtuel Python & installation dépendances'},
+
+  // Proot / distros
+  {cat:'Distro', name:'Installer Debian via proot-distro', cmd:'proot-distro install debian', desc:'Installer Debian trixie via proot-distro'},
+  {cat:'Distro', name:'Installer Ubuntu via proot-distro', cmd:'proot-distro install ubuntu', desc:'Installer Ubuntu 24.04 via proot-distro'},
+  {cat:'Distro', name:'Installer custom rootfs', cmd:'proot-distro install netsecurepro-ia22 --override-alias=netsecurepro-ia22 --rootfs=netsecurepro-ia22-rootfs.tar.gz', desc:'Installer rootfs personnalisé'},
+  {cat:'Distro', name:'Login distro', cmd:'proot-distro login debian', desc:'Se connecter dans la distro'},
+
+  // Networking & scan
+  {cat:'Network', name:'Scan réseau (nmap ping)', cmd:'nmap -sn 192.168.1.0/24', desc:'Découverte des hôtes up sur le réseau local'},
+  {cat:'Network', name:'Table ARP (sans root)', cmd:'ip neigh show', desc:'Lister la table ARP locale'},
+  {cat:'Network', name:'Scan ARP avec script Termux', cmd:'bash ~/netsecurepro_scan.sh', desc:'Script Termux pour créer /sdcard/NetSecurePro/devices.json'},
+  {cat:'Network', name:'Lancer scanner python', cmd:'python3 scan_network.py', desc:'Exécuter scanner Python (nmap -> devices.json)'},
+
+  // Servers & API
+  {cat:'Server', name:'Lancer FastAPI (uvicorn)', cmd:'uvicorn main:app --host 0.0.0.0 --port 8080 --reload', desc:'Démarrer serveur FastAPI (dev)'},
+  {cat:'Server', name:'Lancer Flask simple', cmd:'python3 app.py', desc:'Démarrer serveur Flask local (port indiqué dans script)'},
+  {cat:'Server', name:'Start systemd service', cmd:'systemctl enable --now netsecurepro.service', desc:'Activer et démarrer le service systemd du projet'},
+
+  // NetSecurePro modules
+  {cat:'NetSecurePro', name:'Lancer IA22_DZERO API', cmd:'./IA22_DZERO_EXEC_API &', desc:'Démarrer l\'API IA22_DZERO en arrière-plan'},
+  {cat:'NetSecurePro', name:'Exécuter run_ia22_dzero_exec', cmd:'bash run_ia22_dzero_exec.sh', desc:'Script principal d\'exécution IA22_DZERO'},
+
+  // DNS & Bind
+  {cat:'DNS', name:'Configurer Bind (setup)', cmd:'bash setup_bind_zone.sh', desc:'Installer et configurer une zone DNS locale via Bind9'},
+  {cat:'DNS', name:'Reload Bind9', cmd:'systemctl reload bind9', desc:'Recharger la configuration DNS'},
+
+  // Packaging & build
+  {cat:'Packaging', name:'Construire .deb', cmd:'dpkg-deb --build netsecurepro-ia', desc:'Générer paquet Debian à partir du dossier netsecurepro-ia'},
+  {cat:'Packaging', name:'Construire APK Flutter (release)', cmd:'flutter build apk --release', desc:'Compiler APK Flutter en mode release'},
+
+  // Utilities
+  {cat:'Utils', name:'Afficher logs journalctl', cmd:'journalctl -u netsecurepro.service -f', desc:'Suivre logs du service NetSecurePro'},
+  {cat:'Utils', name:'Exporter rootfs proot-distro', cmd:'proot-distro export debian netsecurepro-ia22-rootfs.tar.gz', desc:'Exporter rootfs actuel pour distribution personnalisée'},
+  {cat:'Utils', name:'Copier devices.json vers sdcard', cmd:'cp ~/NetSecurePro_NetworkGuard/devices.json /sdcard/NetSecurePro/devices.json', desc:'Rendre devices.json accessible à WebView APK'},
+  {cat:'Utils', name:'Nettoyage apt', cmd:'apt autoremove -y && apt autoclean', desc:'Nettoyage des paquets inutiles'}
+];
+
+// ----- UI logic -----
+const grid = document.getElementById('grid');
+const q = document.getElementById('q');
+const clearBtn = document.getElementById('clearBtn');
+const exportBtn = document.getElementById('exportBtn');
+
+function render(commands){
+  grid.innerHTML = '';
+  // group by category
+  const groups = {};
+  commands.forEach(c=>{
+    if(!groups[c.cat]) groups[c.cat]=[];
+    groups[c.cat].push(c);
+  });
+
+  for(const [cat, list] of Object.entries(groups)){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<h3>${cat} <span style="float:right" class="small">${list.length} commandes</span></h3><div class="meta">Liste des commandes utiles pour <strong>${cat}</strong></div>`;
+    list.forEach(cmd=>{
+      const node = document.createElement('div');
+      node.className = 'cmd';
+      node.innerHTML = `<div class="code">${escapeHtml(cmd.cmd)}</div>
+        <div class="actions">
+          <button class="btn copy" data-cmd="${encodeURIComponent(cmd.cmd)}">Copier</button>
+          <button class="btn ghost run" data-cmd="${encodeURIComponent(cmd.cmd)}">Exécuter</button>
+        </div>`;
+      const desc = document.createElement('div');
+      desc.className = 'small';
+      desc.textContent = cmd.name + " — " + cmd.desc;
+      card.appendChild(node);
+      card.appendChild(desc);
+    });
+    grid.appendChild(card);
+  }
+
+  // attach listeners
+  document.querySelectorAll('.btn.copy').forEach(b=>{
+    b.onclick = (e)=>{
+      const cmd = decodeURIComponent(b.getAttribute('data-cmd'));
+      navigator.clipboard.writeText(cmd).then(()=> {
+        b.textContent = 'Copié ✓';
+        b.classList.add('copyok');
+        setTimeout(()=>{ b.textContent='Copier'; b.classList.remove('copyok'); }, 1600);
+      });
+    };
+  });
+
+  document.querySelectorAll('.btn.run').forEach(b=>{
+    b.onclick = async (e)=>{
+      const cmd = decodeURIComponent(b.getAttribute('data-cmd'));
+      // Confirm
+      if(!confirm('Exécuter la commande localement via l\'API ?\\n\\n' + cmd)) return;
+      // POST to backend endpoint /api/execute (must be implemented server-side)
+      try {
+        const res = await fetch('/api/execute',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({cmd})
+        });
+        const data = await res.json();
+        alert('Réponse : ' + (data.output || JSON.stringify(data)));
+      } catch(err){
+        alert('Erreur d\'exécution : ' + err.message + '\\n\\n(Remarque : /api/execute doit être implémenté et sécurisé côté serveur.)');
+      }
+    };
+  });
+}
+
+function escapeHtml(s){
+  return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+}
+
+// search
+function doSearch(){
+  const qv = q.value.trim().toLowerCase();
+  if(!qv){ render(COMMANDS); return; }
+  const filtered = COMMANDS.filter(c=> (c.cmd+c.name+c.desc+c.cat).toLowerCase().includes(qv));
+  render(filtered);
+}
+
+q.addEventListener('input', doSearch);
+clearBtn.addEventListener('click', ()=>{ q.value=''; doSearch(); });
+exportBtn.addEventListener('click', ()=>{
+  // export visible commands to csv
+  const rows = [];
+  const qv = q.value.trim().toLowerCase();
+  const filtered = qv ? COMMANDS.filter(c=> (c.cmd+c.name+c.desc+c.cat).toLowerCase().includes(qv)) : COMMANDS;
+  rows.push(['category','name','command','description']);
+  filtered.forEach(r=> rows.push([r.cat, r.name, r.cmd, r.desc]));
+  const csv = rows.map(r=> r.map(cell=> `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='ia22_commands.csv'; document.body.appendChild(a); a.click(); a.remove();
+});
+
+render(COMMANDS);
+</script>
+</body>
+</html>
