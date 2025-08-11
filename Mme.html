@@ -67,4 +67,37 @@
         fetchLastModified();
     </script>
 </body>
+</html>            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Carte Universal Chat UI</h1>
+    <div class="map-container">
+        <img src="./docs/visuels/universal_chat_ui_map.png" alt="Carte Universal Chat UI" id="mapImage" />
+        <div class="update-info" id="updateInfo">Chargement des informations...</div>
+    </div>
+
+    <script>
+        // Affiche la date de dernière modification de l'image (si serveur supporte l'info)
+        async function fetchLastModified() {
+            try {
+                const response = await fetch('./docs/visuels/universal_chat_ui_map.png', { method: 'HEAD' });
+                if (response.ok) {
+                    const lastModified = response.headers.get('last-modified');
+                    if (lastModified) {
+                        const date = new Date(lastModified);
+                        document.getElementById('updateInfo').textContent = 
+                            `Dernière mise à jour : ${date.toLocaleString('fr-FR')}`;
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn('Impossible de récupérer la date de modification', error);
+            }
+            document.getElementById('updateInfo').textContent = 'Date de mise à jour non disponible';
+        }
+        fetchLastModified();
+    </script>
+</body>
 </html>
