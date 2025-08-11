@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Carte Universal Chat UI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 2rem;
+            background: #f9f9f9;
+            color: #222;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .map-container {
+            max-width: 900px;
+            margin: auto;
+            border: 1px solid #ccc;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 0 8px rgba(0,0,0,0.1);
+        }
+        img {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: auto;
+            border-radius: 6px;
+        }
+        .update-info {
+            text-align: center;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Carte Universal Chat UI</h1>
+    <div class="map-container">
+        <img src="./docs/visuels/universal_chat_ui_map.png" alt="Carte Universal Chat UI" id="mapImage" />
+        <div class="update-info" id="updateInfo">Chargement des informations...</div>
+    </div>
+
+    <script>
+        // Affiche la date de dernière modification de l'image (si serveur supporte l'info)
+        async function fetchLastModified() {
+            try {
+                const response = await fetch('./docs/visuels/universal_chat_ui_map.png', { method: 'HEAD' });
+                if (response.ok) {
+                    const lastModified = response.headers.get('last-modified');
+                    if (lastModified) {
+                        const date = new Date(lastModified);
+                        document.getElementById('updateInfo').textContent = 
+                            `Dernière mise à jour : ${date.toLocaleString('fr-FR')}`;
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn('Impossible de récupérer la date de modification', error);
+            }
+            document.getElementById('updateInfo').textContent = 'Date de mise à jour non disponible';
+        }
+        fetchLastModified();
+    </script>
+</body>
+</html>
