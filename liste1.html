@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetSecurePro IA - Liste de Commandes</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #1e1e2f;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { text-align: center; color: #00ffcc; }
+  .command-list { display: flex; flex-direction: column; gap: 10px; max-width: 600px; margin: 0 auto; }
+  .command {
+    padding: 10px;
+    border-radius: 8px;
+    background-color: #2b2b3c;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  .command:hover { background-color: #44445a; }
+  .command-desc { font-size: 0.9em; color: #aaaaaa; }
+  .result { margin-top: 20px; padding: 10px; background-color: #2b2b3c; border-radius: 8px; white-space: pre-wrap; }
+  button { background-color: #00ffcc; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: #000; }
+  button:hover { background-color: #00e6b8; }
+</style>
+</head>
+<body>
+
+<h1>NetSecurePro IA - Commandes</h1>
+
+<div class="command-list">
+  <div class="command" data-command="scan_network">
+    <span>Scan Réseau</span>
+    <span class="command-desc">Analyse les périphériques connectés</span>
+    <button>Exécuter</button>
+  </div>
+  <div class="command" data-command="check_firewall">
+    <span>Vérifier Firewall</span>
+    <span class="command-desc">Contrôle l’état du pare-feu local</span>
+    <button>Exécuter</button>
+  </div>
+  <div class="command" data-command="system_update">
+    <span>Mise à jour système</span>
+    <span class="command-desc">Télécharge et installe les mises à jour</span>
+    <button>Exécuter</button>
+  </div>
+</div>
+
+<div class="result" id="result">Résultat des commandes...</div>
+
+<script>
+const API_URL = 'https://milyes.github.io/IA22_LOGIC_ALGORITHM/api/execute'; // ton endpoint API
+const TOKEN = 'TON_TOKEN_SECRET_ICI'; // à remplacer par ton token sécurisé
+
+document.querySelectorAll('.command button').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const cmdDiv = e.target.closest('.command');
+    const command = cmdDiv.getAttribute('data-command');
+    document.getElementById('result').textContent = `Exécution de la commande : ${command}...`;
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`
+        },
+        body: JSON.stringify({ command })
+      });
+      const data = await response.json();
+      document.getElementById('result').textContent = `Résultat :\n${JSON.stringify(data, null, 2)}`;
+
+      // Historique localStorage
+      let history = JSON.parse(localStorage.getItem('command_history') || '[]');
+      history.push({ command, result: data, date: new Date().toISOString() });
+      localStorage.setItem('command_history', JSON.stringify(history));
+
+    } catch (err) {
+      document.getElementById('result').textContent = `Erreur : ${err}`;
+    }
+  });
+});
+</script>
+
+</body>
+</html>
